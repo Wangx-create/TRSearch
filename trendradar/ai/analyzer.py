@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from researcher import Researcher  # 刚才创建了 researcher.py
+from trendradar.researcher import Researcher
 
 @dataclass
 class AIAnalysisResult:
