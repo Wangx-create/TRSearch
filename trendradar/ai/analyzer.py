@@ -56,7 +56,7 @@ class AIAnalyzer:
         self.push_mode = config.get("PUSH_MODE", "both")
 
         # 初始化深度研究模块
-        self.researcher = Researcher(config.get("DEEP_RESEARCH", {}))
+        self.researcher = Researcher(config)
 
         # 加载提示词模板
         self.system_prompt, self.user_prompt_template = self._load_prompt_template(
@@ -176,21 +176,21 @@ class AIAnalyzer:
 
         print(f"\n[AI] 开始预处理内容: 热榜 {hotlist_total} 条, RSS {rss_total} 条")
 
-        # --- 第一部分：处理 RSS 订阅 (高优处理) ---
+        # --- 第一部分：处理 RSS 订阅 (优先处理) ---
         if self.include_rss and rss_stats:
             lines.append("\n### RSS 重点追踪 (深度增强)")
             for stat in rss_stats:
-                # 兼容性处理：尝试获取 titles 列表
                 titles = stat.get("titles", [])
                 for t in titles:
-                    # 鲁棒性：尝试所有可能的标题字段名
                     title = t.get("title") or t.get("text") or t.get("content", "")
                     if not title: continue
                     
                     extra_info = ""
-                    # 搜索触发逻辑：如果是保险相关或者搜索器开启
-                    if self.researcher.enabled:
-                        print(f"🔍 [RSS增强] 正在调研: {title[:30]}...")
+                    # RSS 建议根据关键词过滤，或者直接全量搜索（如果 RSS 质量很高）
+                    should_search_rss = any(k.lower() in title.lower() for k in self.researcher.trigger_keywords)
+                    
+                    if self.researcher.enabled and should_search_rss:
+                        print(f"🔍 [RSS增强] 匹配关键词，正在调研: {title[:35]}...")
                         extra_info = self.researcher.search_and_research(title)
 
                     source = t.get("source_name", "RSS")
@@ -213,10 +213,11 @@ class AIAnalyzer:
                     if not title: continue
                     
                     extra_info = ""
-                    # 热榜只对你关心的关键词进行搜索，避免浪费 API
-                    search_keywords = ["AI", "人寿", "保险", "理赔", "寿险", "安全", "渗透"]
-                    if self.researcher.enabled and any(k.lower() in title.lower() for k in search_keywords):
-                        print(f"🔍 [热榜增强] 命中关键词，正在调研: {title[:30]}...")
+                    # 热榜根据配置文件中的关键词进行搜索
+                    should_search_hot = any(k.lower() in title.lower() for k in self.researcher.trigger_keywords)
+                    
+                    if self.researcher.enabled and should_search_hot:
+                        print(f"🔍 [热榜增强] 匹配关键词，正在调研: {title[:35]}...")
                         extra_info = self.researcher.search_and_research(title)
 
                     source = t.get("source_name", "热榜")
@@ -229,9 +230,8 @@ class AIAnalyzer:
                     if count >= self.max_news: break
                 if count >= self.max_news: break
 
-        print(f"[AI] 内容准备完成，共处理 {count} 条增强新闻\n")
+        print(f"[AI] 内容准备完成，共处理 {count} 条内容。")
         return "\n".join(lines), hotlist_total, rss_total, count
-
     
     def _format_time_range(self, first_time: str, last_time: str) -> str:
         """格式化时间范围"""
