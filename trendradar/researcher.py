@@ -1,57 +1,35 @@
 import requests
-from typing import List, Dict, Any
 
 class Researcher:
-    def __init__(self, config: Dict[str, Any]):
-        """
-        适配 config.yaml 中 deep_research 节点的初始化
-        """
-        # 获取深度搜索配置
-        dr_config = config.get("deep_research", {})
-        
-        self.enabled = dr_config.get("enabled", False)
-        self.api_key = dr_config.get("api_key")
-        # 直接从配置读取触发关键词，如果没有则使用默认值
-        self.trigger_keywords = dr_config.get("trigger_keywords", ["AI", "人寿", "保险", "理赔", "寿险"])
-        self.max_results = dr_config.get("max_results", 3)
-        
-        if self.enabled and self.api_key:
-            print(f"✅ [Researcher] 初始化成功。监控关键词: {self.trigger_keywords}")
-        else:
-            print("⚠️ [Researcher] 未启用或缺少 API Key。")
+    def __init__(self, config):
+        # 从配置文件读取配置
+        self.enabled = config.get("enabled", False)
+        self.api_key = config.get("api_key", "")
+        self.triggers = config.get("trigger_keywords", [])
 
-    def search_and_research(self, query: str) -> str:
-        """
-        调用 Tavily 获取深度内容摘要
-        """
-        if not self.enabled or not self.api_key:
+    def fetch_deep_content(self, title):
+        """如果标题匹配，就上网搜深度内容"""
+        # 1. 检查是否开启，且标题是否值得搜
+        if not self.enabled or not any(word in title for word in self.triggers):
+            print("匹配失败")
             return ""
 
+        print(f"🔍 发现核心话题：[{title}]，正在上网搜寻深度资料...")
+        
+        # 2. 调用 Tavily 搜索接口 (这里以 Tavily 为例)
         url = "https://api.tavily.com/search"
         payload = {
             "api_key": self.api_key,
-            "query": query,
-            "search_depth": "basic",
-            "include_answer": True,  # 核心：获取 Tavily 自动生成的简报
-            "max_results": self.max_results
+            "query": f"{title} 深度深度分析 行业影响",
+            "search_depth": "advanced",
+            "max_results": 2
         }
-
+        
         try:
             response = requests.post(url, json=payload, timeout=15)
-            response.raise_for_status()
-            data = response.json()
-            
-            # 优先返回智能回答 (answer 字段)
-            answer = data.get("answer")
-            if answer:
-                return answer
-            
-            # 如果没有直接回答，返回结果摘要
-            results = data.get("results", [])
-            if results:
-                return " | ".join([r.get('content', '')[:100] for r in results[:2]])
-            
-            return ""
-        except Exception as e:
-            print(f"❌ [Tavily] 搜索异常: {e}")
+            results = response.json().get("results", [])
+            # 把搜到的文章正文拼在一起
+            context = "\n".join([r.get("content", "") for r in results])
+            return f"\n【全网深度补全内容】：\n{context[:2000]}" # 取前2000字防止塞爆
+        except:
             return ""
