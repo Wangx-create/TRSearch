@@ -59,12 +59,12 @@ class AIAnalyzer:
         self.include_rss = config.get("INCLUDE_RSS", True)
         self.push_mode = config.get("PUSH_MODE", "both")
 
+        # --- 重点检查这里！确保上一行有逗号，这一行括号闭合 ---
+        self.researcher = Researcher(config.get("DEEP_RESEARCH", {}))
+
         # 加载提示词模板
         self.system_prompt, self.user_prompt_template = self._load_prompt_template(
             config.get("PROMPT_FILE", "ai_analysis_prompt.txt")
-
-        # 初始化深度研究器 (从配置中获取 DEEP_RESEARCH 相关设置)
-        self.researcher = Researcher(config.get("DEEP_RESEARCH", {}))
         )
 
     def _load_prompt_template(self, prompt_file: str) -> tuple:
