@@ -365,3 +365,13 @@ advanced:
     slack: 4000
   batch_send_interval: 3              # 批次发送间隔（秒）
   feishu_message_separator: "━━━━━━━━━━━━━━━━━━━"
+
+# ===============================================================
+# 9. 深度搜索插件 (新增)
+# ===============================================================
+deep_research:
+  enabled: true                 # 是否开启搜索补全功能
+  api_key: "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"  # 这里填你申请的 Tavily 或其他搜索 API Key
+  # 只有标题包含下面这些词时，才会触发“上网搜资料”，避免浪费流量
+  trigger_keywords: ["DeepSeek", "Sora", "保险政策", "理赔争议", "Scaling Law"]
+  max_results: 3                # 每个话题搜 3 篇深度文章
