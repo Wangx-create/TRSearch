@@ -373,5 +373,6 @@ deep_research:
   enabled: true                 # 是否开启搜索补全功能
   api_key: "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"  # 这里填你申请的 Tavily 或其他搜索 API Key
   # 只有标题包含下面这些词时，才会触发“上网搜资料”，避免浪费流量
-  trigger_keywords: ["DeepSeek", "人寿", "保险", "理赔", "Scaling Law"]
+  trigger_keywords: ["AI", "人寿", "保险", "理赔", "寿险"]
   max_results: 3                # 每个话题搜 3 篇深度文章
+  
