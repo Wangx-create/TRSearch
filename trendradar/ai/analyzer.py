@@ -181,12 +181,22 @@ class AIAnalyzer:
                 if word and titles:
                     lines.append(f"\n**{word}** ({len(titles)}条)")
                     for t in titles:
-                        if not isinstance(t, dict): continue
+                        if not isinstance(t, dict): 
+                            print("DEBUG: 数据格式不对，不是字典") # 加这行
+                            continue
                         title = t.get("title", "")
-                        if not title: continue
+                        if not title: 
+                            print("DEBUG: 找不到 title 字段") # 加这行
+                            continue
                         
                         # 联网深度搜索
+                        print(f"DEBUG: 准备为标题发起搜索尝试 -> {title}")
                         extra_info = self.researcher.fetch_deep_content(title)
+
+                        if extra_info:
+                            print(f"DEBUG: ✅ 搜索成功，获取到内容")
+                        else:
+                            print(f"DEBUG: ❌ 搜索返回为空（可能是关键词没匹配或搜索失败）")
                         
                         source = t.get("source_name", t.get("source", ""))
                         ranks = t.get("ranks", [])
