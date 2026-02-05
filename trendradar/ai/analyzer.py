@@ -56,7 +56,7 @@ class AIAnalyzer:
         self.push_mode = config.get("PUSH_MODE", "both")
 
         # 初始化深度研究模块
-        self.researcher = Researcher(config)
+        self.researcher = Researcher(config.get("DEEP_RESEARCH", {}))
 
         # 加载提示词模板
         self.system_prompt, self.user_prompt_template = self._load_prompt_template(
@@ -166,73 +166,86 @@ class AIAnalyzer:
         stats: List[Dict],
         rss_stats: Optional[List[Dict]] = None,
     ) -> tuple:
-        """准备新闻内容文本（Tavily 深度搜索版）"""
+        """准备新闻内容文本（深度增强版）"""
         lines = []
         count = 0
-        
-        # 统计总数
         hotlist_total = sum(len(s.get("titles", [])) for s in stats) if stats else 0
         rss_total = sum(len(s.get("titles", [])) for s in rss_stats) if rss_stats else 0
 
-        print(f"\n[AI] 开始预处理内容: 热榜 {hotlist_total} 条, RSS {rss_total} 条")
-
-        # --- 第一部分：处理 RSS 订阅 (优先处理) ---
-        if self.include_rss and rss_stats:
-            lines.append("\n### RSS 重点追踪 (深度增强)")
-            for stat in rss_stats:
-                titles = stat.get("titles", [])
-                for t in titles:
-                    title = t.get("title") or t.get("text") or t.get("content", "")
-                    if not title: continue
-                    
-                    extra_info = ""
-                    # RSS 建议根据关键词过滤，或者直接全量搜索（如果 RSS 质量很高）
-                    should_search_rss = any(k.lower() in title.lower() for k in self.researcher.trigger_keywords)
-                    
-                    if self.researcher.enabled and should_search_rss:
-                        print(f"🔍 [RSS增强] 匹配关键词，正在调研: {title[:35]}...")
-                        extra_info = self.researcher.search_and_research(title)
-
-                    source = t.get("source_name", "RSS")
-                    line = f"- [{source}] {title}"
-                    if extra_info:
-                        line += f"\n  └─ 🔍 [深度调研]: {extra_info}"
-                    
-                    lines.append(line)
-                    count += 1
-                    if count >= self.max_news: break
-                if count >= self.max_news: break
-
-        # --- 第二部分：处理社交热榜 ---
-        if stats and count < self.max_news:
-            lines.append("\n### 社交热榜趋势")
+        if stats:
+            lines.append("### 热榜新闻")
+            lines.append("格式: [来源] 标题 | 排名:最高-最低 | 时间:首次~末次 | 出现:N次")
             for stat in stats:
+                word = stat.get("word", "")
                 titles = stat.get("titles", [])
-                for t in titles:
-                    title = t.get("title") or t.get("text") or t.get("content", "")
-                    if not title: continue
-                    
-                    extra_info = ""
-                    # 热榜根据配置文件中的关键词进行搜索
-                    should_search_hot = any(k.lower() in title.lower() for k in self.researcher.trigger_keywords)
-                    
-                    if self.researcher.enabled and should_search_hot:
-                        print(f"🔍 [热榜增强] 匹配关键词，正在调研: {title[:35]}...")
-                        extra_info = self.researcher.search_and_research(title)
+                if word and titles:
+                    lines.append(f"\n**{word}** ({len(titles)}条)")
+                    for t in titles:
+                        if not isinstance(t, dict): 
+                            print("DEBUG: 数据格式不对，不是字典") # 加这行
+                            continue
+                        title = t.get("title", "")
+                        if not title: 
+                            print("DEBUG: 找不到 title 字段") # 加这行
+                            continue
+                        
+                        # 联网深度搜索
+                        print(f"DEBUG: 准备为标题发起搜索尝试 -> {title}")
+                        extra_info = self.researcher.fetch_deep_content(title)
 
-                    source = t.get("source_name", "热榜")
-                    line = f"- [{source}] {title}"
-                    if extra_info:
-                        line += f"\n  └─ 🔍 [深度调研]: {extra_info}"
-                    
-                    lines.append(line)
-                    count += 1
-                    if count >= self.max_news: break
+                        if extra_info:
+                            print(f"DEBUG: ✅ 搜索成功，获取到内容")
+                        else:
+                            print(f"DEBUG: ❌ 搜索返回为空（可能是关键词没匹配或搜索失败）")
+                        
+                        source = t.get("source_name", t.get("source", ""))
+                        ranks = t.get("ranks", [])
+                        rank_str = f"{min(ranks)}-{max(ranks)}" if ranks else "-"
+                        first_time = t.get("first_time", "")
+                        last_time = t.get("last_time", "")
+                        time_str = self._format_time_range(first_time, last_time)
+                        appear_count = t.get("count", 1)
+
+                        line = f"- [{source}] {title}" if source else f"- {title}"
+                        if extra_info:
+                            line += f"\n  └─ [深度参考内容]: {extra_info}"
+                        
+                        line += f" | 排名:{rank_str} | 时间:{time_str} | 出现:{appear_count}次"
+                        lines.append(line)
+                        count += 1
+                        if count >= self.max_news: break
                 if count >= self.max_news: break
 
-        print(f"[AI] 内容准备完成，共处理 {count} 条内容。")
+        if self.include_rss and rss_stats and count < self.max_news:
+            lines.append("\n### RSS 订阅")
+            lines.append("格式: [来源] 标题 | 发布时间")
+            for stat in rss_stats:
+                word = stat.get("word", "")
+                titles = stat.get("titles", [])
+                if word and titles:
+                    lines.append(f"\n**{word}** ({len(titles)}条)")
+                    for t in titles:
+                        if not isinstance(t, dict): continue
+                        title = t.get("title", "")
+                        if not title: continue
+
+                        extra_info = self.researcher.fetch_deep_content(title)
+                        source = t.get("source_name", t.get("feed_name", ""))
+                        time_display = t.get("time_display", "")
+
+                        line = f"- [{source}] {title}" if source else f"- {title}"
+                        if extra_info:
+                            line += f"\n  └─ [深度参考内容]: {extra_info}"
+                        
+                        if time_display:
+                            line += f" | {time_display}"
+                        lines.append(line)
+                        count += 1
+                        if count >= self.max_news: break
+                if count >= self.max_news: break
+
         return "\n".join(lines), hotlist_total, rss_total, count
-    
+
     def _format_time_range(self, first_time: str, last_time: str) -> str:
         """格式化时间范围"""
         def extract_time(time_str: str) -> str:
