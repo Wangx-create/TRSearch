@@ -213,8 +213,8 @@ class AIAnalyzer:
                         
                         # 热榜比较杂，建议只对匹配关键词的进行搜索
                         extra_info = ""
-                        # 检查标题里是否有你关心的词，比如 '保险', 'AI', '安全'
-                        if any(k.lower() in title.lower() for k in ["保险", "AI", "安全", "险"]):
+                        # 检查标题里是否有你关心的词
+                        if any(k.lower() in title.lower() for k in ["AI", "人寿", "保险", "理赔", "寿险"]):
                             extra_info = self.researcher.search_and_research(title)
 
                         source = t.get("source_name", "热榜")
