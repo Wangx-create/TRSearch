@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from researcher import Researcher  # 刚才创建了 researcher.py
 
 @dataclass
 class AIAnalysisResult:
@@ -61,6 +62,9 @@ class AIAnalyzer:
         # 加载提示词模板
         self.system_prompt, self.user_prompt_template = self._load_prompt_template(
             config.get("PROMPT_FILE", "ai_analysis_prompt.txt")
+
+        # 初始化深度研究器 (从配置中获取 DEEP_RESEARCH 相关设置)
+        self.researcher = Researcher(config.get("DEEP_RESEARCH", {}))
         )
 
     def _load_prompt_template(self, prompt_file: str) -> tuple:
@@ -198,19 +202,13 @@ class AIAnalyzer:
                 error=friendly_msg
             )
 
-    def _prepare_news_content(
+def _prepare_news_content(
         self,
         stats: List[Dict],
         rss_stats: Optional[List[Dict]] = None,
     ) -> tuple:
         """
-        准备新闻内容文本（增强版）
-
-        热榜新闻包含：来源、标题、排名范围、时间范围、出现次数
-        RSS 包含：来源、标题、发布时间
-
-        Returns:
-            tuple: (content_str, hotlist_total, rss_total, analyzed_count)
+        准备新闻内容文本（深度增强版）
         """
         lines = []
         count = 0
@@ -219,7 +217,7 @@ class AIAnalyzer:
         hotlist_total = sum(len(s.get("titles", [])) for s in stats) if stats else 0
         rss_total = sum(len(s.get("titles", [])) for s in rss_stats) if rss_stats else 0
 
-        # 热榜内容
+        # 1. 处理热榜内容
         if stats:
             lines.append("### 热榜新闻")
             lines.append("格式: [来源] 标题 | 排名:最高-最低 | 时间:首次~末次 | 出现:N次")
@@ -229,47 +227,34 @@ class AIAnalyzer:
                 if word and titles:
                     lines.append(f"\n**{word}** ({len(titles)}条)")
                     for t in titles:
-                        if not isinstance(t, dict):
-                            continue
+                        if not isinstance(t, dict): continue
                         title = t.get("title", "")
-                        if not title:
-                            continue
+                        if not title: continue
 
-                        # 来源
+                        # --- 核心：联网深度搜索 ---
+                        extra_info = self.researcher.fetch_deep_content(title)
+                        
                         source = t.get("source_name", t.get("source", ""))
-
-                        # 排名范围
                         ranks = t.get("ranks", [])
-                        if ranks:
-                            min_rank = min(ranks)
-                            max_rank = max(ranks)
-                            rank_str = f"{min_rank}" if min_rank == max_rank else f"{min_rank}-{max_rank}"
-                        else:
-                            rank_str = "-"
-
-                        # 时间范围（简化显示）
+                        rank_str = f"{min(ranks)}-{max(ranks)}" if ranks else "-"
                         first_time = t.get("first_time", "")
                         last_time = t.get("last_time", "")
                         time_str = self._format_time_range(first_time, last_time)
-
-                        # 出现次数
                         appear_count = t.get("count", 1)
 
-                        # 构建行：[来源] 标题 | 排名:X-Y | 时间:首次~末次 | 出现:N次
-                        if source:
-                            line = f"- [{source}] {title}"
-                        else:
-                            line = f"- {title}"
+                        # 构建显示行
+                        line = f"- [{source}] {title}" if source else f"- {title}"
+                        if extra_info:
+                            line += f"\n  └─ [深度参考内容]: {extra_info}"
+                        
                         line += f" | 排名:{rank_str} | 时间:{time_str} | 出现:{appear_count}次"
                         lines.append(line)
 
                         count += 1
-                        if count >= self.max_news:
-                            break
-                if count >= self.max_news:
-                    break
+                        if count >= self.max_news: break
+                if count >= self.max_news: break
 
-        # RSS 内容（仅在启用时提交）
+        # 2. 处理 RSS 内容
         if self.include_rss and rss_stats and count < self.max_news:
             lines.append("\n### RSS 订阅")
             lines.append("格式: [来源] 标题 | 发布时间")
@@ -279,34 +264,31 @@ class AIAnalyzer:
                 if word and titles:
                     lines.append(f"\n**{word}** ({len(titles)}条)")
                     for t in titles:
-                        if not isinstance(t, dict):
-                            continue
+                        if not isinstance(t, dict): continue
                         title = t.get("title", "")
-                        if not title:
-                            continue
+                        if not title: continue
 
-                        # 来源
+                        # --- 核心：RSS 标题也支持联网搜索 ---
+                        extra_info = self.researcher.fetch_deep_content(title)
+
                         source = t.get("source_name", t.get("feed_name", ""))
-
-                        # 发布时间
                         time_display = t.get("time_display", "")
 
-                        # 构建行：[来源] 标题 | 发布时间
-                        if source:
-                            line = f"- [{source}] {title}"
-                        else:
-                            line = f"- {title}"
+                        # 构建显示行
+                        line = f"- [{source}] {title}" if source else f"- {title}"
+                        if extra_info:
+                            line += f"\n  └─ [深度参考内容]: {extra_info}"
+                        
                         if time_display:
                             line += f" | {time_display}"
                         lines.append(line)
 
                         count += 1
-                        if count >= self.max_news:
-                            break
-                if count >= self.max_news:
-                    break
+                        if count >= self.max_news: break
+                if count >= self.max_news: break
 
         return "\n".join(lines), hotlist_total, rss_total, count
+
 
     def _format_time_range(self, first_time: str, last_time: str) -> str:
         """格式化时间范围（简化显示，只保留时分）"""
