@@ -11,6 +11,7 @@ class Researcher:
         """如果标题匹配，就上网搜深度内容"""
         # 1. 检查是否开启，且标题是否值得搜
         if not self.enabled or not any(word in title for word in self.triggers):
+            print("匹配失败")
             return ""
 
         print(f"🔍 发现核心话题：[{title}]，正在上网搜寻深度资料...")
