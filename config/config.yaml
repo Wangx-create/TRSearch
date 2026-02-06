@@ -375,3 +375,5 @@ deep_research:
   # 只有标题包含下面这些词时，才会触发“上网搜资料”，避免浪费流量
   trigger_keywords: ["AI", "人寿", "保险", "理赔", "寿险", "安全", "渗透"]
   max_results: 3                # 每个话题搜 3 篇深度文章
+  search_depth: "advanced" # Tavily 搜索深度       
+  timeout: 15 # 请求超时（秒） 
