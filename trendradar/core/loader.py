@@ -217,6 +217,7 @@ def _load_ai_analysis_config(config_data: Dict) -> Dict:
         "MAX_NEWS_FOR_ANALYSIS": ai_config.get("max_news_for_analysis", 50),
         "INCLUDE_RSS": ai_config.get("include_rss", True),
         "PROMPT_FILE": ai_config.get("prompt_file", "ai_analysis_prompt.txt"),
+        "DEEP_RESEARCH": config_data.get("deep_research", {}),
     }
 
 
