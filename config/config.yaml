@@ -129,7 +129,7 @@ rss:
 #    • 适用场景：避免重复信息干扰
 # ===============================================================
 report:
-  mode: "daily"                     # 可选: daily | current | incremental
+  mode: "daily"                     # 可选: daily | current | incremental | search
   display_mode: "keyword"             # 可选: keyword | platform
                                       # keyword: 按关键词分组显示（默认）
                                       # platform: 按平台/来源分组显示
@@ -371,7 +371,7 @@ advanced:
 # ===============================================================
 deep_research:
   enabled: true                 # 是否开启搜索补全功能
-  api_key: "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"  # 这里填你申请的 Tavily 或其他搜索 API Key
+  api_key: "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"  # 这里填 Tavily 的 API Key
   # title 模式下：只有标题包含下面这些词时，才会触发“上网搜资料”，避免浪费流量
   trigger_keywords: [ "AI" , "人寿" , "保险" , "理赔" , "寿险" , "安全" , "渗透" ]
   # keyword 模式下：直接按这些关键词触发全网搜索
