@@ -10,6 +10,8 @@ class Researcher:
         self.enabled = config.get("enabled", False)
         self.api_key = config.get("api_key", "")
         self.triggers = config.get("trigger_keywords", [])
+        self.query_keywords = config.get("query_keywords", [])
+        self.mode = config.get("mode", "title")
         self.max_results = config.get("max_results", 3)
         self.search_depth = config.get("search_depth", "advanced")
         self.timeout = config.get("timeout", 15)
@@ -17,6 +19,10 @@ class Researcher:
     def _should_trigger(self, query: str) -> bool:
         if not self.enabled or not self.api_key:
             return False
+        if self.mode == "keyword":
+            if self.query_keywords:
+                return query in self.query_keywords
+            return True
         if not self.triggers:
             return True
         return any(word in query for word in self.triggers)
@@ -25,7 +31,6 @@ class Researcher:
         """搜索全网新闻并返回结果列表"""
         if not self._should_trigger(query):
             return []
-
         payload = {
             "api_key": self.api_key,
             "query": query,
@@ -40,7 +45,7 @@ class Researcher:
         response.raise_for_status()
         data = response.json()
         return data.get("results", [])
-
+    
     def read_article(self, url: str) -> str:
         """读取文章正文"""
         if not url:
@@ -82,16 +87,16 @@ class Researcher:
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
-    def fetch_deep_content(self, title):
-        """如果标题匹配，就上网搜深度内容"""
-        if not self._should_trigger(title):
+    def fetch_deep_content(self, query: str) -> str:
+        """如果 query 匹配，就上网搜深度内容"""
+        if not self._should_trigger(query):
             print("匹配失败")
             return ""
 
-        print(f"🔍 发现核心话题：[{title}]，正在上网搜寻深度资料...")
+        print(f"🔍 发现核心话题：[{query}]，正在上网搜寻深度资料...")
         
         try:
-            results = self.search_news(query=f"{title} 深度分析 行业影响", include_url=True)
+            results = self.search_news(query=f"{query} 深度分析 行业影响", include_url=True)
             contents = []
             for result in results:
                 url = result.get("url", "")
@@ -108,3 +113,14 @@ class Researcher:
             return f"\n【全网深度补全内容】：\n{context[:2000]}"
         except requests.RequestException:
             return ""
+
+    def fetch_keyword_research(self, keyword: str) -> str:
+        """按关键词触发的全网深度检索"""
+        if not keyword:
+            return ""
+        previous_mode = self.mode
+        try:
+            self.mode = "keyword"
+            return self.fetch_deep_content(keyword)
+        finally:
+            self.mode = previous_mode
