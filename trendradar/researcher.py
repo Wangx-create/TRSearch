@@ -84,7 +84,6 @@ class Researcher:
 
     def fetch_deep_content(self, title):
         """如果标题匹配，就上网搜深度内容"""
-        # 1. 检查是否开启，且标题是否值得搜
         if not self._should_trigger(title):
             print("匹配失败")
             return ""
@@ -92,12 +91,6 @@ class Researcher:
         print(f"🔍 发现核心话题：[{title}]，正在上网搜寻深度资料...")
         
         try:
-            response = requests.post(url, json=payload, timeout=15)
-            results = response.json().get("results", [])
-            # 把搜到的文章正文拼在一起
-            context = "\n".join([r.get("content", "") for r in results])
-            return f"\n【全网深度补全内容】：\n{context[:2000]}" # 取前2000字防止塞爆
-        except:
             results = self.search_news(query=f"{title} 深度分析 行业影响", include_url=True)
             contents = []
             for result in results:
