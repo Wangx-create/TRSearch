@@ -100,6 +100,15 @@ class NewsAnalyzer:
             "should_generate_summary": True,
             "summary_mode": "daily",
         },
+        "search": {
+            "mode_name": "仅搜索模式",
+            "description": "仅搜索模式（跳过热榜与 RSS，仅执行关键词检索与 AI 分析）",
+            "realtime_report_type": "",
+            "summary_report_type": "搜索分析",
+            "should_send_realtime": False,
+            "should_generate_summary": False,
+            "summary_mode": "search",
+        },
     }
 
     def __init__(self):
@@ -242,6 +251,7 @@ class NewsAnalyzer:
         mode: str,
         report_type: str,
         id_to_name: Optional[Dict],
+        keywords_override: Optional[List[str]] = None,
     ) -> Optional[AIAnalysisResult]:
         """执行 AI 分析"""
         ai_config = self.ctx.config.get("AI_ANALYSIS", {})
@@ -256,7 +266,10 @@ class NewsAnalyzer:
             platforms = list(id_to_name.values()) if id_to_name else []
 
             # 提取关键词列表
-            keywords = [s.get("word", "") for s in stats if s.get("word")] if stats else []
+            if keywords_override is not None:
+                keywords = keywords_override
+            else:
+                keywords = [s.get("word", "") for s in stats if s.get("word")] if stats else []
 
             result = analyzer.analyze(
                 stats=stats,
@@ -563,6 +576,7 @@ class NewsAnalyzer:
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
         standalone_data: Optional[Dict] = None,
+        ai_keywords: Optional[List[str]] = None,
     ) -> bool:
         """统一的通知发送逻辑，包含所有判断条件，支持热榜+RSS合并推送+AI分析+独立展示区"""
         has_notification = self._has_notification_configured()
@@ -571,12 +585,21 @@ class NewsAnalyzer:
         # 检查是否有有效内容（热榜或RSS）
         has_news_content = self._has_valid_content(stats, new_titles)
         has_rss_content = bool(rss_items and len(rss_items) > 0)
-        has_any_content = has_news_content or has_rss_content
-
         # 计算热榜匹配条数
         news_count = sum(len(stat.get("titles", [])) for stat in stats) if stats else 0
         # rss_items 是统计列表 [{"word": "xx", "count": 5, ...}]，需累加 count
         rss_count = sum(stat.get("count", 0) for stat in rss_items) if rss_items else 0
+
+        # AI 分析（如果启用）
+        ai_result = None
+        ai_config = cfg.get("AI_ANALYSIS", {})
+        should_run_ai = ai_config.get("ENABLED", False) and (has_news_content or has_rss_content or mode == "search")
+        if should_run_ai:
+            ai_result = self._run_ai_analysis(
+                stats, rss_items, mode, report_type, id_to_name, keywords_override=ai_keywords
+            )
+
+        has_any_content = has_news_content or has_rss_content or (mode == "search" and ai_result and ai_result.success)
 
         if (
             cfg["ENABLE_NOTIFICATION"]
@@ -585,6 +608,8 @@ class NewsAnalyzer:
         ):
             # 输出推送内容统计
             content_parts = []
+            if mode == "search" and ai_result and ai_result.success:
+                content_parts.append("搜索")
             if news_count > 0:
                 content_parts.append(f"热榜 {news_count} 条")
             if rss_count > 0:
@@ -611,14 +636,6 @@ class NewsAnalyzer:
                         return False
                     else:
                         print(f"推送窗口控制：今天首次推送")
-
-            # AI 分析（如果启用）
-            ai_result = None
-            ai_config = cfg.get("AI_ANALYSIS", {})
-            if ai_config.get("ENABLED", False):
-                ai_result = self._run_ai_analysis(
-                    stats, rss_items, mode, report_type, id_to_name
-                )
 
             # 准备报告数据
             report_data = self.ctx.prepare_report(stats, failed_ids, new_titles, id_to_name, mode)
@@ -785,12 +802,38 @@ class NewsAnalyzer:
             print(f"{summary_type}HTML已生成: {html_file}")
         return html_file
 
+    def _run_search_only(self) -> None:
+        """仅搜索模式：跳过热榜与 RSS，只执行关键词检索与 AI 分析"""
+        ai_config = self.ctx.config.get("AI_ANALYSIS", {})
+        deep_research = ai_config.get("DEEP_RESEARCH", {}) if ai_config else {}
+        keywords = deep_research.get("query_keywords") or deep_research.get("trigger_keywords") or []
+
+        if not keywords:
+            print("搜索模式：未配置 query_keywords/trigger_keywords，跳过执行")
+            return
+
+        print(f"搜索模式：关键词 {keywords}")
+
+        self._send_notification_if_needed(
+            stats=[],
+            report_type="搜索分析",
+            mode="search",
+            failed_ids=[],
+            new_titles={},
+            id_to_name={},
+            html_file_path=None,
+            rss_items=None,
+            rss_new_items=None,
+            standalone_data=None,
+            ai_keywords=keywords,
+        )
+    
     def _initialize_and_check_config(self) -> None:
         """通用初始化和配置检查"""
         now = self.ctx.get_time()
         print(f"当前北京时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        if not self.ctx.config["ENABLE_CRAWLER"]:
+        if not self.ctx.config["ENABLE_CRAWLER"] and self.report_mode != "search":
             print("爬虫功能已禁用（ENABLE_CRAWLER=False），程序退出")
             return
 
@@ -1360,6 +1403,10 @@ class NewsAnalyzer:
 
             mode_strategy = self._get_mode_strategy()
 
+            if self.report_mode == "search":
+                self._run_search_only()
+                return
+            
             # 抓取热榜数据
             results, id_to_name, failed_ids = self._crawl_data()
 
