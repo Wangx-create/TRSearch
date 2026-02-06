@@ -299,7 +299,7 @@ ai_analysis:
                                     # 其他提供商必须填写完整 URL
                                     # 示例: https://api.openai.com/v1/chat/completions
 
-  timeout: 180                       # 请求超时（秒）
+  timeout: 300                       # 请求超时（秒）
 
   # 推送模式（仅在 enabled: true 时生效）
   # - only_analysis: 仅推送 AI 分析结果（若开启了“独立展示区”则一并保留，屏蔽原始热榜/RSS 列表）
