@@ -172,6 +172,13 @@ class AIAnalyzer:
         hotlist_total = sum(len(s.get("titles", [])) for s in stats) if stats else 0
         rss_total = sum(len(s.get("titles", [])) for s in rss_stats) if rss_stats else 0
 
+        if self.researcher.mode == "keyword" and self.researcher.query_keywords:
+            lines.append("### 全网关键词深度检索")
+            for keyword in self.researcher.query_keywords:
+                keyword_context = self.researcher.fetch_keyword_research(keyword)
+                if keyword_context:
+                    lines.append(f"- {keyword}\n  └─ [关键词深度参考内容]: {keyword_context}")
+        
         if stats:
             lines.append("### 热榜新闻")
             lines.append("格式: [来源] 标题 | 排名:最高-最低 | 时间:首次~末次 | 出现:N次")
@@ -180,6 +187,9 @@ class AIAnalyzer:
                 titles = stat.get("titles", [])
                 if word and titles:
                     lines.append(f"\n**{word}** ({len(titles)}条)")
+                    keyword_context = self.researcher.fetch_keyword_research(word)
+                    if keyword_context:
+                        lines.append(f"  └─ [关键词深度参考内容]: {keyword_context}")
                     for t in titles:
                         if not isinstance(t, dict): 
                             print("DEBUG: 数据格式不对，不是字典") # 加这行
@@ -189,14 +199,7 @@ class AIAnalyzer:
                             print("DEBUG: 找不到 title 字段") # 加这行
                             continue
                         
-                        # 联网深度搜索
-                        print(f"DEBUG: 准备为标题发起搜索尝试 -> {title}")
-                        extra_info = self.researcher.fetch_deep_content(title)
-
-                        if extra_info:
-                            print(f"DEBUG: ✅ 搜索成功，获取到内容")
-                        else:
-                            print(f"DEBUG: ❌ 搜索返回为空（可能是关键词没匹配或搜索失败）")
+                        extra_info = ""
                         
                         source = t.get("source_name", t.get("source", ""))
                         ranks = t.get("ranks", [])
@@ -224,12 +227,15 @@ class AIAnalyzer:
                 titles = stat.get("titles", [])
                 if word and titles:
                     lines.append(f"\n**{word}** ({len(titles)}条)")
+                    keyword_context = self.researcher.fetch_keyword_research(word)
+                    if keyword_context:
+                        lines.append(f"  └─ [关键词深度参考内容]: {keyword_context}")
                     for t in titles:
                         if not isinstance(t, dict): continue
                         title = t.get("title", "")
                         if not title: continue
 
-                        extra_info = self.researcher.fetch_deep_content(title)
+                        extra_info = ""
                         source = t.get("source_name", t.get("feed_name", ""))
                         time_display = t.get("time_display", "")
 
